@@ -68,7 +68,9 @@ def render_dashboard_tab():
                 qa_data.pop(i)
                 save_qa_log(qa_data)
                 st.warning("Deleted.")
-                st.experimental_rerun()
+                st.rerun()
+
+    
 
     st.markdown("---")
     st.subheader("➕ Add Custom Question & Answer")
@@ -87,6 +89,7 @@ def render_dashboard_tab():
             qa_data.append(new_entry)
             save_qa_log(qa_data)
             st.success("Saved new Q&A to log!")
-            st.experimental_rerun()
+            st.rerun()
+
         else:
             st.warning("Please enter both question and answer.")
