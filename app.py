@@ -6,9 +6,7 @@ from openai import OpenAI
 from drawing import generate_drawing_with_stability
 from sound import get_animal_sound_file
 
-# ------------------------
-# 🌍 Setup
-# ------------------------
+# 🌍 Load environment variables
 load_dotenv()
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
@@ -18,7 +16,7 @@ client = OpenAI(
 )
 
 # ------------------------
-# 📚 Load KB
+# 📚 Load local answers
 # ------------------------
 def load_answers():
     try:
@@ -34,7 +32,7 @@ def get_answer_from_kb(question, kb):
     return None
 
 # ------------------------
-# 🤖 AI Response
+# 🤖 AI response with child name
 # ------------------------
 def get_ai_response_openai(question, child_name):
     try:
@@ -43,7 +41,7 @@ def get_ai_response_openai(question, child_name):
             messages=[
                 {
                     "role": "system",
-                    "content": f"You are a fun and friendly dad helping Nadeen or Yazan. Always say 'Hi {child_name}!' at the beginning and answer in a playful and kind way."
+                    "content": f"You are a fun and friendly dad helping Nadeen\Yazan. Always say 'Hi {child_name}!' and answer in a playful, kind way."
                 },
                 {
                     "role": "user",
@@ -60,18 +58,18 @@ def get_ai_response_openai(question, child_name):
         return f"AI error: {e}"
 
 # ------------------------
-# 🎨 UI
+# 🎨 UI Setup
 # ------------------------
 st.set_page_config(page_title="Ask Audi & Gofran", page_icon="👨‍👧‍👦", layout="centered")
 st.title("👨‍👧 Ask Audi & Gofran")
 
-tab1, tab2 = st.tabs(["💬 Hi Nadeen or Yazan! Ask your question", "🐾 Which animal would you like to see?"])
+tab1, tab2 = st.tabs(["💬 Hi Nadeen\Yazan! Ask your question", "🐾 Which animal would you like to see?"])
 
 # ------------------------
 # 🟦 Tab 1: Ask a question
 # ------------------------
 with tab1:
-    child_name = st.text_input("👧 What's your name?", value="Nadeen or Yazan")
+    child_name = st.text_input("👧 What's your name?", value="Nadeen\Yazan")
     question = st.text_input("What do you want to ask?")
     option = st.radio("What do you want to do?", ["💬 Just answer", "🎨 Just draw", "💡 Do both"])
     
@@ -100,13 +98,16 @@ with tab1:
                     st.audio(f.read(), format="audio/mp3")
 
 # ------------------------
-# 🟩 Tab 2: Pick an animal
+# 🟩 Tab 2: Choose animal to draw or hear
 # ------------------------
 with tab2:
     st.markdown("Pick your favorite animal and draw it or hear its sound!")
 
     animals = ["cat", "dog", "lion", "elephant", "monkey", "cow"]
     selected_animal = st.selectbox("🦁 Choose an animal:", animals)
+
+    if "animal_image" not in st.session_state:
+        st.session_state.animal_image = None
 
     col1, col2 = st.columns(2)
 
@@ -115,7 +116,8 @@ with tab2:
             with st.spinner(f"Drawing a {selected_animal}..."):
                 image_data, error = generate_drawing_with_stability(selected_animal)
                 if image_data:
-                    st.image(image_data, caption=f"Here’s your {selected_animal}! 🎨")
+                    st.session_state.animal_image = image_data
+                    st.balloons()
                 else:
                     st.error(f"Couldn't draw the {selected_animal}. {error}")
 
@@ -127,3 +129,7 @@ with tab2:
                     st.audio(f.read(), format="audio/mp3")
             else:
                 st.error(f"Sorry, no sound for {selected_animal} yet!")
+
+    # ✅ Keep showing image
+    if st.session_state.animal_image:
+        st.image(st.session_state.animal_image, caption=f"Here's your {selected_animal}! 🎨")
