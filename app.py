@@ -92,7 +92,7 @@ tab1, tab2, tab3 = st.tabs([
 # 🟦 Tab 1 – Ask a question
 # ------------------------
 with tab1:
-    child_name = st.text_input("👧 What's your name?", value="Jana")
+    child_name = st.text_input("👧 What's your name?", value="Nadeen\Yazan")
     question = st.text_input("What do you want to ask?")
     option = st.radio("What do you want to do?", ["💬 Just answer", "🎨 Just draw", "💡 Do both"])
 
