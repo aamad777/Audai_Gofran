@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from drawing import generate_drawing_with_stability
 from sound import get_animal_sound_file
+from dashboard import render_dashboard_tab
 
-# 🌍 Load environment variables
+# 🌍 Load environment
 load_dotenv()
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
@@ -16,7 +17,7 @@ client = OpenAI(
 )
 
 # ------------------------
-# 📚 Load local answers
+# 📚 Answer loading
 # ------------------------
 def load_answers():
     try:
@@ -25,14 +26,23 @@ def load_answers():
     except:
         return {}
 
-def get_answer_from_kb(question, kb):
-    for q in kb:
-        if q.lower() in question.lower():
-            return kb[q]
-    return None
+def load_qa_log():
+    if os.path.exists("qa_log.json"):
+        with open("qa_log.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_qa_log(data):
+    with open("qa_log.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def log_qa(question, answer):
+    data = load_qa_log()
+    data[question] = answer
+    save_qa_log(data)
 
 # ------------------------
-# 🤖 AI response with child name
+# 🤖 AI
 # ------------------------
 def get_ai_response_openai(question, child_name):
     try:
@@ -41,7 +51,7 @@ def get_ai_response_openai(question, child_name):
             messages=[
                 {
                     "role": "system",
-                    "content": f"You are a fun and friendly dad helping Nadeen\Yazan. Always say 'Hi {child_name}!' and answer in a playful, kind way."
+                    "content": f"You are a fun and friendly dad helping kids. Always say 'Hi {child_name}!' and answer in a playful, kind way."
                 },
                 {
                     "role": "user",
@@ -50,7 +60,7 @@ def get_ai_response_openai(question, child_name):
             ],
             extra_headers={
                 "HTTP-Referer": "https://askdad.com",
-                "X-Title": "Ask Audi & Gofran"
+                "X-Title": "Ask Dad AI"
             }
         )
         return response.choices[0].message.content
@@ -58,30 +68,46 @@ def get_ai_response_openai(question, child_name):
         return f"AI error: {e}"
 
 # ------------------------
-# 🎨 UI Setup
+# Match to KB
 # ------------------------
-st.set_page_config(page_title="Ask Audi & Gofran", page_icon="👨‍👧‍👦", layout="centered")
-st.title("👨‍👧 Ask Audi & Gofran")
-
-tab1, tab2 = st.tabs(["💬 Hi Nadeen\Yazan! Ask your question", "🐾 Which animal would you like to see?"])
+def get_answer_from_kb(question, kb):
+    for q in kb:
+        if q.lower() in question.lower():
+            return kb[q]
+    return None
 
 # ------------------------
-# 🟦 Tab 1: Ask a question
+# 🌈 UI
+# ------------------------
+st.set_page_config(page_title="Ask Dad AI", page_icon="👨‍👧‍👦", layout="centered")
+st.title("👨‍👧 Ask Dad AI")
+
+tab1, tab2, tab3 = st.tabs([
+    "💬 Hi kids! Ask your question",
+    "🐾 Which animal would you like to see?",
+    "🛠️ Dad's Dashboard"
+])
+
+# ------------------------
+# 🟦 Tab 1 – Ask a question
 # ------------------------
 with tab1:
-    child_name = st.text_input("👧 What's your name?", value="Nadeen\Yazan")
+    child_name = st.text_input("👧 What's your name?", value="Jana")
     question = st.text_input("What do you want to ask?")
     option = st.radio("What do you want to do?", ["💬 Just answer", "🎨 Just draw", "💡 Do both"])
-    
+
     if st.button("✨ Go!", key="go_button"):
         image_data = None
-        kb = load_answers()
+        kb1 = load_answers()
+        kb2 = load_qa_log()
+        kb = {**kb1, **kb2}
+
         answer = get_answer_from_kb(question, kb)
         response_text = answer if answer else get_ai_response_openai(question, child_name)
-        
+
         if option in ["💬 Just answer", "💡 Do both"]:
             st.success(f"💬 Dad says: {response_text}")
-        
+
         if option in ["🎨 Just draw", "💡 Do both"]:
             with st.spinner("Drawing your idea... 🖌️"):
                 image_data, error = generate_drawing_with_stability(response_text)
@@ -90,15 +116,18 @@ with tab1:
                     st.balloons()
                 else:
                     st.error(f"❌ Drawing failed: {error}")
-        
+
         sound_file = get_animal_sound_file(question)
         if sound_file:
             if st.button("🔊 Play animal sound!", key="sound_from_question"):
                 with open(sound_file, "rb") as f:
                     st.audio(f.read(), format="audio/mp3")
 
+        # Save this Q&A to dashboard
+        log_qa(question, response_text)
+
 # ------------------------
-# 🟩 Tab 2: Choose animal to draw or hear
+# 🟩 Tab 2 – Animal Fun
 # ------------------------
 with tab2:
     st.markdown("Pick your favorite animal and draw it or hear its sound!")
@@ -128,8 +157,13 @@ with tab2:
                 with open(sound_file, "rb") as f:
                     st.audio(f.read(), format="audio/mp3")
             else:
-                st.error(f"Sorry, no sound for {selected_animal} yet!")
+                st.error(f"No sound found for {selected_animal}.")
 
-    # ✅ Keep showing image
     if st.session_state.animal_image:
         st.image(st.session_state.animal_image, caption=f"Here's your {selected_animal}! 🎨")
+
+# ------------------------
+# 🛠️ Tab 3 – Dashboard
+# ------------------------
+with tab3:
+    render_dashboard_tab()
