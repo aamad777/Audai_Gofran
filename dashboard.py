@@ -40,7 +40,6 @@ def render_dashboard_tab():
 
     filter_text = st.text_input("🔍 Search by name or keyword:")
 
-    # Safe filtering with index
     filtered_data = []
     for i, q in enumerate(qa_data):
         if isinstance(q, dict):
@@ -68,9 +67,7 @@ def render_dashboard_tab():
                 qa_data.pop(i)
                 save_qa_log(qa_data)
                 st.warning("Deleted.")
-                st.rerun()
-
-    
+                st.experimental_rerun()  # ✅ FIXED HERE
 
     st.markdown("---")
     st.subheader("➕ Add Custom Question & Answer")
@@ -89,7 +86,6 @@ def render_dashboard_tab():
             qa_data.append(new_entry)
             save_qa_log(qa_data)
             st.success("Saved new Q&A to log!")
-            st.rerun()
-
+            st.experimental_rerun()
         else:
             st.warning("Please enter both question and answer.")
