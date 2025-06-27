@@ -61,13 +61,13 @@ def get_ai_response_openai(question, name):
             messages=[
                 {
                     "role": "system",
-                    "content": f"You are a fun and friendly Audai & Gofran helping a Nadeen\Yazan named {name}. Keep answers kind, playful, and short."
+                    "content": f"You are a fun and friendly ROA W AMMAR helping a Jana named {name}. Keep answers kind, playful, and short."
                 },
                 {"role": "user", "content": question}
             ],
             extra_headers={
-                "HTTP-Referer": "https://askAudai & Gofran.streamlit.app",
-                "X-Title": "Ask Audai & Gofran"
+                "HTTP-Referer": "https://askROA W AMMAR.streamlit.app",
+                "X-Title": "Ask ROA W AMMAR"
             }
         )
         return response.choices[0].message.content
@@ -95,13 +95,13 @@ def save_question_log(name, question, answer):
 # ----------------------------
 # UI Starts
 # ----------------------------
-st.set_page_config(page_title="Ask Audai & Gofran", page_icon="👨‍👧", layout="centered")
+st.set_page_config(page_title="Ask ROA W AMMAR", page_icon="👨‍👧", layout="centered")
 
-tab1, tab2, tab3 = st.tabs(["💬 Hi Nadeen\Yazans! Ask your question", "🐾 Which animal would you like to see?", "🛠️ Audai & Gofran's Dashboard"])
+tab1, tab2, tab3 = st.tabs(["💬 Hi Janas! Ask your question", "🐾 Which animal would you like to see?", "🛠️ ROA W AMMAR's Dashboard"])
 
-# TAB 1: Ask Audai & Gofran
+# TAB 1: Ask ROA W AMMAR
 with tab1:
-    st.title("👨‍👧 Ask Audai & Gofran")
+    st.title("👨‍👧 Ask ROA W AMMAR")
 
     child_name = st.text_input("🙋 What's your name?", key="child_name")
 
@@ -119,10 +119,10 @@ with tab1:
 
             answer = get_answer_from_kb(question, kb)
             if answer:
-                response = f"Audai & Gofran says: {answer}"
+                response = f"ROA W AMMAR says: {answer}"
             else:
                 answer = get_ai_response_openai(question, child_name)
-                response = f"Audai & Gofran says: {answer}"
+                response = f"ROA W AMMAR says: {answer}"
                 save_question_log(child_name, question, answer)
 
             if mode in ["💬 Just answer", "💡 Do both"]:
@@ -154,10 +154,8 @@ with tab2:
             with st.spinner("Drawing your animal..."):
                 image = generate_drawing_with_stability(animal)
                 if image:
-                    if isinstance(image, list):
-                        st.image(image[0], caption=f"{animal.capitalize()} drawing!")
-                    else:
-                        st.image(image, caption=f"{animal.capitalize()} drawing!")
+                    st.session_state["animal_image"] = image
+                    st.session_state["last_drawn_animal"] = animal
                 else:
                     st.error("Could not draw the animal.")
 
@@ -171,6 +169,14 @@ with tab2:
                     st.audio(sound_bytes, format="audio/mp3")
                 else:
                     st.error("No sound available for that animal.")
+
+    # Show image if saved
+    if "animal_image" in st.session_state:
+        image = st.session_state["animal_image"]
+        if isinstance(image, list):
+            st.image(image[0], caption=f"{animal.capitalize()} drawing!")
+        else:
+            st.image(image, caption=f"{animal.capitalize()} drawing!")
 
 # TAB 3: Dashboard
 with tab3:
