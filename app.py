@@ -1,65 +1,72 @@
 import streamlit as st
 import json
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 from drawing import generate_drawing_with_stability
-from sound import get_animal_sound_file
+from sound import play_animal_sound
 from dashboard import render_dashboard_tab
 
-# 🌍 Load environment
+# Load environment variables
 load_dotenv()
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+# Initialize OpenRouter-compatible OpenAI client
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=API_KEY,
 )
 
-# ------------------------
-# 📚 Answer loading
-# ------------------------
-def load_answers():
+# File paths
+QA_LOG = "qa_log.json"
+KB_FILE = "answers.json"
+
+# Make sure QA log exists
+if not os.path.exists(QA_LOG):
+    with open(QA_LOG, "w", encoding="utf-8") as f:
+        json.dump([], f)
+
+# Load answers.json knowledge base
+def load_answers_kb():
     try:
-        with open("answers.json", "r", encoding="utf-8") as f:
+        with open(KB_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except Exception as e:
+        st.warning(f"Couldn't load knowledge base: {e}")
         return {}
 
-def load_qa_log():
-    if os.path.exists("qa_log.json"):
-        with open("qa_log.json", "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+# Load qa_log.json as knowledge base too
+def load_qa_log_kb():
+    try:
+        with open(QA_LOG, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return {item["question"]: item["answer"] for item in data if isinstance(item, dict)}
+    except Exception as e:
+        st.warning(f"Couldn't load QA log: {e}")
+        return {}
 
-def save_qa_log(data):
-    with open("qa_log.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+# Get match from knowledge base
+def get_answer_from_kb(question, kb):
+    for q in kb:
+        if q.lower() in question.lower():
+            return kb[q]
+    return None
 
-def log_qa(question, answer):
-    data = load_qa_log()
-    data[question] = answer
-    save_qa_log(data)
-
-# ------------------------
-# 🤖 AI
-# ------------------------
-def get_ai_response_openai(question, child_name):
+# Call OpenRouter API for fallback answer
+def get_ai_response_openai(question, name):
     try:
         response = client.chat.completions.create(
             model="mistralai/mistral-small-3.2-24b-instruct:free",
             messages=[
                 {
                     "role": "system",
-                    "content": f"You are a fun and friendly Audai & Gofran helping Nadeen\Yazan. Always say 'Hi {child_name}!' and answer in a playful, kind way."
+                    "content": f"You are a fun and friendly Audai & Gofran helping a kid named {name}. Keep answers kind, playful, and short."
                 },
-                {
-                    "role": "user",
-                    "content": f"My name is {child_name}. {question}"
-                }
+                {"role": "user", "content": question}
             ],
             extra_headers={
-                "HTTP-Referer": "https://askAudai & Gofran.com",
+                "HTTP-Referer": "https://askAudai & Gofran.streamlit.app",
                 "X-Title": "Ask Audai & Gofran"
             }
         )
@@ -67,103 +74,104 @@ def get_ai_response_openai(question, child_name):
     except Exception as e:
         return f"AI error: {e}"
 
-# ------------------------
-# Match to KB
-# ------------------------
-def get_answer_from_kb(question, kb):
-    for q in kb:
-        if q.lower() in question.lower():
-            return kb[q]
-    return None
+# Save Q&A to qa_log.json
+def save_question_log(name, question, answer):
+    try:
+        with open(QA_LOG, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except:
+        data = []
 
-# ------------------------
-# 🌈 UI
-# ------------------------
-st.set_page_config(page_title="Ask Audai & Gofran", page_icon="👨‍👧‍👦", layout="centered")
-st.title("👨‍👧 Ask Audai & Gofran")
+    data.append({
+        "name": name,
+        "question": question,
+        "answer": answer,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
 
-tab1, tab2, tab3 = st.tabs([
-    "💬 Hi Nadeen\Yazan! Ask your question",
-    "🐾 Which animal would you like to see?",
-    "🛠️ Audai & Gofran's Dashboard"
-])
+    with open(QA_LOG, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
-# ------------------------
-# 🟦 Tab 1 – Ask a question
-# ------------------------
+# ----------------------------
+# UI Starts
+# ----------------------------
+st.set_page_config(page_title="Ask Audai & Gofran", page_icon="👨‍👧", layout="centered")
+
+tab1, tab2, tab3 = st.tabs(["💬 Hi Nadeen\Yazan! Ask your question", "🐾 Which animal would you like to see?", "🛠️ Audai & Gofran's Dashboard"])
+
+# TAB 1: Ask Audai & Gofran
 with tab1:
-    child_name = st.text_input("👧 What's your name?", value="Nadeen\Yazan")
-    question = st.text_input("What do you want to ask?")
-    option = st.radio("What do you want to do?", ["💬 Just answer", "🎨 Just draw", "💡 Do both"])
+    st.title("👨‍👧 Ask Audai & Gofran")
 
-    if st.button("✨ Go!", key="go_button"):
-        image_data = None
-        kb1 = load_answers()
-        kb2 = load_qa_log()
-        kb = {**kb1, **kb2}
+    child_name = st.text_input("🙋 What's your name?", key="child_name")
 
-        answer = get_answer_from_kb(question, kb)
-        response_text = answer if answer else get_ai_response_openai(question, child_name)
+    question = st.text_input("What do you want to ask?", key="question_input")
 
-        if option in ["💬 Just answer", "💡 Do both"]:
-            st.success(f"💬 Audai & Gofran says: {response_text}")
+    mode = st.radio("What do you want to do?", ["💬 Just answer", "🎨 Just draw", "💡 Do both"])
 
-        if option in ["🎨 Just draw", "💡 Do both"]:
-            with st.spinner("Drawing your idea... 🖌️"):
-                image_data, error = generate_drawing_with_stability(response_text)
-                if image_data:
-                    st.image(image_data, caption="Your AI drawing! 🎨")
-                    st.balloons()
-                else:
-                    st.error(f"❌ Drawing failed: {error}")
+    if st.button("✨ Go!", key="ask_btn"):
+        if not child_name or not question:
+            st.warning("Please enter your name and a question.")
+        else:
+            kb1 = load_answers_kb()
+            kb2 = load_qa_log_kb()
+            kb = {**kb1, **kb2}
 
-        sound_file = get_animal_sound_file(question)
-        if sound_file:
-            if st.button("🔊 Play animal sound!", key="sound_from_question"):
-                with open(sound_file, "rb") as f:
-                    st.audio(f.read(), format="audio/mp3")
+            answer = get_answer_from_kb(question, kb)
+            if answer:
+                response = f"Audai & Gofran says: {answer}"
+            else:
+                answer = get_ai_response_openai(question, child_name)
+                response = f"Audai & Gofran says: {answer}"
+                save_question_log(child_name, question, answer)
 
-        # Save this Q&A to dashboard
-        log_qa(question, response_text)
+            if mode in ["💬 Just answer", "💡 Do both"]:
+                st.success(response)
 
-# ------------------------
-# 🟩 Tab 2 – Animal Fun
-# ------------------------
+            if mode in ["🎨 Just draw", "💡 Do both"]:
+                with st.spinner("Drawing something fun... 🎨"):
+                    image = generate_drawing_with_stability(question)
+                    if image:
+                        if isinstance(image, list):
+                            st.image(image[0], caption="Your drawing!")
+                        else:
+                            st.image(image, caption="Your drawing!")
+                    else:
+                        st.error("Oops! Couldn't draw right now. Try again!")
+
+# TAB 2: Animal Sound and Drawing
 with tab2:
-    st.markdown("Pick your favorite animal and draw it or hear its sound!")
+    st.title("🐾 Pick an animal!")
 
-    animals = ["cat", "dog", "lion", "elephant", "monkey", "cow"]
-    selected_animal = st.selectbox("🦁 Choose an animal:", animals)
-
-    if "animal_image" not in st.session_state:
-        st.session_state.animal_image = None
+    animal = st.text_input("Which animal do you like?", key="animal_input")
 
     col1, col2 = st.columns(2)
 
-    with col1:
-        if st.button("🎨 Draw this animal"):
-            with st.spinner(f"Drawing a {selected_animal}..."):
-                image_data, error = generate_drawing_with_stability(selected_animal)
-                if image_data:
-                    st.session_state.animal_image = image_data
-                    st.balloons()
+    if col1.button("🎨 Draw this animal"):
+        if not animal:
+            st.warning("Please enter an animal name.")
+        else:
+            with st.spinner("Drawing your animal..."):
+                image = generate_drawing_with_stability(animal)
+                if image:
+                    if isinstance(image, list):
+                        st.image(image[0], caption=f"{animal.capitalize()} drawing!")
+                    else:
+                        st.image(image, caption=f"{animal.capitalize()} drawing!")
                 else:
-                    st.error(f"Couldn't draw the {selected_animal}. {error}")
+                    st.error("Could not draw the animal.")
 
-    with col2:
-        if st.button("🔊 Hear this animal"):
-            sound_file = get_animal_sound_file(selected_animal)
-            if sound_file:
-                with open(sound_file, "rb") as f:
-                    st.audio(f.read(), format="audio/mp3")
-            else:
-                st.error(f"No sound found for {selected_animal}.")
+    if col2.button("🔊 Hear animal sound"):
+        if not animal:
+            st.warning("Please enter an animal name.")
+        else:
+            with st.spinner("Fetching animal sound..."):
+                sound_bytes = play_animal_sound(animal)
+                if sound_bytes:
+                    st.audio(sound_bytes, format="audio/mp3")
+                else:
+                    st.error("No sound available for that animal.")
 
-    if st.session_state.animal_image:
-        st.image(st.session_state.animal_image, caption=f"Here's your {selected_animal}! 🎨")
-
-# ------------------------
-# 🛠️ Tab 3 – Dashboard
-# ------------------------
+# TAB 3: Dashboard
 with tab3:
     render_dashboard_tab()
