@@ -40,6 +40,7 @@ def render_dashboard_tab():
 
     filter_text = st.text_input("🔍 Search by name or keyword:")
 
+    # Safe filtering with index
     filtered_data = []
     for i, q in enumerate(qa_data):
         if isinstance(q, dict):
@@ -66,8 +67,7 @@ def render_dashboard_tab():
             if st.button("🗑️ Delete", key=f"delete_{i}"):
                 qa_data.pop(i)
                 save_qa_log(qa_data)
-                st.warning("Deleted.")
-                st.experimental_rerun()  # ✅ FIXED HERE
+                st.success("Deleted. Please refresh the page manually to see the update.")
 
     st.markdown("---")
     st.subheader("➕ Add Custom Question & Answer")
@@ -85,7 +85,6 @@ def render_dashboard_tab():
             }
             qa_data.append(new_entry)
             save_qa_log(qa_data)
-            st.success("Saved new Q&A to log!")
-            st.experimental_rerun()
+            st.success("Saved new Q&A to log! Please refresh to see it in the dashboard.")
         else:
             st.warning("Please enter both question and answer.")
